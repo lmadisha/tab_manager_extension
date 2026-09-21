@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Dead Tab Cleaner",
+  "version": "0.1.0",
+  "description": "Review tabs whose resources may be unavailable.",
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_title": "Dead Tab Cleaner"
+  },
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "permissions": ["tabs", "tabGroups", "storage", "scripting"],
+  "host_permissions": ["http://*/*", "https://*/*"]
+}
