@@ -55,4 +55,29 @@ describe("scanTabs", () => {
 
     expect(result).toMatchObject({ status: "temporary_error", reason: "Network timeout" });
   });
+
+  it("uses bounded parallel requests for a large set of unique URLs", async () => {
+    const manyTabs = Array.from({ length: 20 }, (_, index) => ({
+      id: index + 1,
+      windowId: 1,
+      index,
+      title: `Tab ${index + 1}`,
+      url: `https://example.test/${index + 1}`,
+      pinned: false
+    })) as chrome.tabs.Tab[];
+    let activeRequests = 0;
+    let maximumActiveRequests = 0;
+    const fetchImpl = vi.fn(async () => {
+      activeRequests += 1;
+      maximumActiveRequests = Math.max(maximumActiveRequests, activeRequests);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      activeRequests -= 1;
+      return new Response(null, { status: 200 });
+    });
+
+    await scanTabs(manyTabs, { fetchImpl, ignoreRules: [] });
+
+    expect(maximumActiveRequests).toBeGreaterThan(6);
+    expect(maximumActiveRequests).toBeLessThan(manyTabs.length);
+  });
 });
