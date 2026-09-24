@@ -10,19 +10,27 @@ const flagged = (result: TabScanResult) => result.status !== "healthy";
 export function App() {
   const [results, setResults] = useState<TabScanResult[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [filter, setFilter] = useState<"all" | TabHealthStatus>("all");
+  const [filter, setFilter] = useState<"all" | "duplicates" | TabHealthStatus>("all");
   const [scanning, setScanning] = useState(false);
 
   const applyResults = (next: TabScanResult[]) => { setResults(next); setSelected(new Set(next.filter(isInitiallySelected).map((r) => r.tabId))); };
   useEffect(() => { request({ type: "getResults" }).then((response) => applyResults(response.results)); }, []);
-  const visible = useMemo(() => results.filter(flagged).filter((r) => filter === "all" || r.status === filter), [results, filter]);
+  const duplicates = useMemo(() => results.filter((result) => result.duplicateOfTabId !== undefined), [results]);
+  const visible = useMemo(() => filter === "duplicates"
+    ? duplicates
+    : results.filter(flagged).filter((result) => filter === "all" || result.status === filter), [results, filter, duplicates]);
   const ids = [...selected];
   const runScan = async () => { setScanning(true); try { applyResults((await request({ type: "scanTabs" })).results); } finally { setScanning(false); } };
   const act = async (message: ExtensionMessage) => applyResults((await request(message)).results);
 
+  const showDuplicates = () => {
+    setFilter("duplicates");
+    setSelected(new Set(duplicates.map((result) => result.tabId)));
+  };
+
   return <main className="dashboard"><header><div><p className="eyebrow">TAB HEALTH</p><h1>Dead Tab Cleaner</h1></div><button onClick={runScan} disabled={scanning}>{scanning ? "Scanning…" : "Scan tabs"}</button></header>
-    <section className="summary">{(["dead", "restricted", "temporary_error", "unknown"] as TabHealthStatus[]).map((status) => <button key={status} className={filter === status ? "active" : ""} onClick={() => setFilter(status)}>{status.replace("_", " ")}: {results.filter((r) => r.status === status).length}</button>)}<button onClick={() => setFilter("all")}>All flagged</button></section>
-    <TabList results={visible} selectedIds={selected} onSelectionChange={(id, checked) => setSelected((current) => { const next = new Set(current); checked ? next.add(id) : next.delete(id); return next; })} />
-    <footer className="actions"><span>{ids.length} selected</span><button disabled={!ids.length} onClick={() => { if (confirm(`Close ${ids.length} tabs?`)) act({ type: "closeTabs", tabIds: ids }); }}>Close</button><button disabled={!ids.length} onClick={() => act({ type: "moveToWindow", tabIds: ids })}>Move to new window</button><button disabled={!ids.length} onClick={() => { const title = prompt("Group name", "Dead tabs"); if (title) act({ type: "groupTabs", tabIds: ids, title }); }}>Add to group</button><button onClick={() => act({ type: "undoClose" })}>Undo close</button></footer>
+    <section className="summary">{(["dead", "restricted", "temporary_error", "unknown"] as TabHealthStatus[]).map((status) => <button key={status} className={filter === status ? "active" : ""} onClick={() => setFilter(status)}>{status.replace("_", " ")}: {results.filter((r) => r.status === status).length}</button>)}<button className={filter === "duplicates" ? "active" : ""} onClick={showDuplicates}>Duplicates: {duplicates.length}</button><button onClick={() => setFilter("all")}>All flagged</button></section>
+    <TabList results={visible} selectedIds={selected} emptyMessage={filter === "duplicates" ? "No duplicate tabs in this scan." : "No flagged tabs in this scan."} onSelectionChange={(id, checked) => setSelected((current) => { const next = new Set(current); checked ? next.add(id) : next.delete(id); return next; })} />
+    <footer className="actions"><span>{ids.length} selected</span><button disabled={!ids.length} onClick={() => { if (confirm(`Close ${ids.length} tabs?`)) act({ type: "closeTabs", tabIds: ids }); }}>Close</button><button disabled={!ids.length} onClick={() => act({ type: "moveToWindow", tabIds: ids })}>Move to new window</button><button disabled={!ids.length} onClick={() => { const title = prompt("Group name", filter === "duplicates" ? "Duplicate tabs" : "Dead tabs"); if (title) act({ type: "groupTabs", tabIds: ids, title }); }}>Add to group</button><button onClick={() => act({ type: "undoClose" })}>Undo close</button></footer>
   </main>;
 }

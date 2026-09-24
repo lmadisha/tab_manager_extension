@@ -34,6 +34,23 @@ describe("scanTabs", () => {
     );
     expect(results).toHaveLength(2);
     expect(results.every((result) => result.status === "dead" && result.httpStatus === 404)).toBe(true);
+    expect(results.map((result) => result.duplicateOfTabId)).toEqual([undefined, 2]);
+  });
+
+  it("marks only exact URL copies after the first eligible tab as duplicates", async () => {
+    const exactCopies = [
+      { ...tabs[1], id: 20, url: "https://example.test/page?x=1#top" },
+      { ...tabs[2], id: 21, url: "https://example.test/page?x=1#top" },
+      { ...tabs[2], id: 22, url: "https://example.test/page?x=2#top" },
+      { ...tabs[2], id: 23, url: "https://example.test/page?x=1#bottom" }
+    ] as chrome.tabs.Tab[];
+
+    const results = await scanTabs(exactCopies, {
+      fetchImpl: vi.fn().mockResolvedValue(new Response(null, { status: 200 })),
+      ignoreRules: []
+    });
+
+    expect(results.map((result) => result.duplicateOfTabId)).toEqual([undefined, 20, undefined, undefined]);
   });
 
   it("falls back to GET when HEAD is rejected", async () => {

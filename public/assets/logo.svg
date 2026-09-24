@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">Tab Manager logo</title>
+  <desc id="description">A browser window containing a TM monogram with a cursor crossing its lower-right edge.</desc>
+
+  <path
+    fill="#192131"
+    stroke="#7DD3FC"
+    stroke-width="18"
+    d="M108 64h296a60 60 0 0 1 60 60v264a60 60 0 0 1-60 60H108a60 60 0 0 1-60-60V124a60 60 0 0 1 60-60Z"
+  />
+  <path fill="#7DD3FC" d="M48 146h416v18H48z" />
+  <path
+    fill="#7DD3FC"
+    d="M104 96h112a24 24 0 0 1 24 24v35H80v-35a24 24 0 0 1 24-24Z"
+  />
+  <circle cx="406" cy="110" r="13" fill="#FB7185" />
+
+  <path fill="#E8EDF5" d="M118 211h122v30h-45v113h-32V241h-45z" />
+  <path fill="#E8EDF5" d="M244 354V211h30l37 50 37-50h30v143h-30v-94l-37 50-37-50v94z" />
+
+  <path
+    fill="#7DD3FC"
+    stroke="#10141C"
+    stroke-linejoin="round"
+    stroke-width="13"
+    d="m342 286 94 84-42 7 22 48-34 16-22-49-33 36Z"
+  />
+</svg>

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
+import { App } from "../src/dashboard/App";
 import { TabList } from "../src/dashboard/TabList";
 import type { TabScanResult } from "../src/shared/types";
 
@@ -39,4 +40,26 @@ it("renders large result sets in batches", () => {
 
   expect(screen.getAllByRole("checkbox")).toHaveLength(100);
   expect(screen.getByText("Showing 100 of 1000")).toBeTruthy();
+});
+
+it("shows and selects duplicate copies, replacing the previous dead-tab selection", async () => {
+  const results: TabScanResult[] = [
+    { tabId: 1, windowId: 1, title: "Original", url: "https://example.test", status: "dead", confidence: "high", reason: "404", scannedAt: 1 },
+    { tabId: 2, windowId: 1, title: "Copy one", url: "https://example.test", duplicateOfTabId: 1, status: "healthy", confidence: "high", reason: "Available", scannedAt: 1 },
+    { tabId: 3, windowId: 2, title: "Copy two", url: "https://example.test", duplicateOfTabId: 1, status: "healthy", confidence: "high", reason: "Available", scannedAt: 1 },
+    { tabId: 4, windowId: 1, title: "Other", url: "https://other.test", status: "healthy", confidence: "high", reason: "Available", scannedAt: 1 }
+  ];
+  vi.stubGlobal("chrome", { runtime: { sendMessage: vi.fn().mockResolvedValue({ results }) } });
+
+  render(<App />);
+  await screen.findByRole("button", { name: "Duplicates: 2" });
+  expect(screen.getByText("1 selected")).toBeTruthy();
+
+  fireEvent.click(screen.getByRole("button", { name: "Duplicates: 2" }));
+
+  expect(await screen.findByLabelText("Copy one")).toHaveProperty("checked", true);
+  expect(screen.getByLabelText("Copy two")).toHaveProperty("checked", true);
+  expect(screen.getByText("2 selected")).toBeTruthy();
+  expect(screen.queryByLabelText("Original")).toBeNull();
+  expect(screen.queryByLabelText("Other")).toBeNull();
 });
