@@ -60,9 +60,25 @@ export async function groupTabs(
   const tabs = await getLiveTabs(tabIds, chromeApi);
   if (!tabs.length) return;
 
-  const liveTabIds = tabs.map((tab) => tab.id!) as [number, ...number[]];
-  const groupId = await chromeApi.tabs.group(existingGroupId === undefined ? { tabIds: liveTabIds } : { tabIds: liveTabIds, groupId: existingGroupId });
-  if (existingGroupId === undefined) {
+  if (existingGroupId !== undefined) {
+    const liveTabIds = tabs.map((tab) => tab.id!) as [number, ...number[]];
+    await chromeApi.tabs.group({ tabIds: liveTabIds, groupId: existingGroupId });
+    return;
+  }
+
+  const tabsByWindow = new Map<number, number[]>();
+  for (const tab of tabs) {
+    if (tab.windowId === undefined || tab.id === undefined) continue;
+    const windowTabs = tabsByWindow.get(tab.windowId) ?? [];
+    windowTabs.push(tab.id);
+    tabsByWindow.set(tab.windowId, windowTabs);
+  }
+
+  for (const [windowId, windowTabIds] of tabsByWindow) {
+    const groupId = await chromeApi.tabs.group({
+      tabIds: windowTabIds as [number, ...number[]],
+      createProperties: { windowId }
+    });
     await chromeApi.tabGroups.update(groupId, { title, color: "grey" });
   }
 }

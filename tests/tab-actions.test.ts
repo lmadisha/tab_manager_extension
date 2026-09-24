@@ -6,7 +6,8 @@ function createChromeAdapter() {
     tabs: {
       query: vi.fn().mockResolvedValue([
         { id: 11, url: "https://a.test", windowId: 1, index: 0, pinned: false },
-        { id: 12, url: "https://b.test", windowId: 1, index: 1, pinned: false }
+        { id: 12, url: "https://b.test", windowId: 1, index: 1, pinned: false },
+        { id: 13, url: "https://c.test", windowId: 2, index: 0, pinned: false }
       ]),
       remove: vi.fn().mockResolvedValue(undefined),
       create: vi.fn().mockResolvedValue(undefined),
@@ -43,7 +44,19 @@ describe("tab actions", () => {
 
     await groupTabs([11, 12], "Dead tabs", chrome);
 
-    expect(chrome.tabs.group).toHaveBeenCalledWith({ tabIds: [11, 12] });
+    expect(chrome.tabs.group).toHaveBeenCalledWith({ tabIds: [11, 12], createProperties: { windowId: 1 } });
     expect(chrome.tabGroups.update).toHaveBeenCalledWith(7, { title: "Dead tabs", color: "grey" });
+  });
+
+  it("creates a same-named group in each selected tab window", async () => {
+    const chrome = createChromeAdapter();
+    chrome.tabs.group.mockResolvedValueOnce(7).mockResolvedValueOnce(8);
+
+    await groupTabs([11, 13], "Duplicate tabs", chrome);
+
+    expect(chrome.tabs.group).toHaveBeenNthCalledWith(1, { tabIds: [11], createProperties: { windowId: 1 } });
+    expect(chrome.tabs.group).toHaveBeenNthCalledWith(2, { tabIds: [13], createProperties: { windowId: 2 } });
+    expect(chrome.tabGroups.update).toHaveBeenNthCalledWith(1, 7, { title: "Duplicate tabs", color: "grey" });
+    expect(chrome.tabGroups.update).toHaveBeenNthCalledWith(2, 8, { title: "Duplicate tabs", color: "grey" });
   });
 });

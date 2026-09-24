@@ -2,6 +2,7 @@ import { closeTabs, groupTabs, moveToNewWindow, undoClose } from "./tab-actions"
 import { classifyTab, isInitiallySelected } from "../services/classifier";
 import { scanTabs } from "../services/scanner";
 import { getBrowserStorage } from "../services/storage";
+import { MAX_CONCURRENT_PAGE_INSPECTIONS } from "../shared/constants";
 import type { ExtensionMessage } from "../shared/messages";
 import type { DetectionResult, TabScanResult } from "../shared/types";
 
@@ -27,15 +28,22 @@ async function scanOpenTabs(): Promise<TabScanResult[]> {
   const storage = getBrowserStorage();
   const results = await scanTabs(await chrome.tabs.query({}), { ignoreRules: await storage.getIgnoreRules() });
 
-  for (const result of results) {
-    try {
-      const injected = await chrome.scripting.executeScript({ target: { tabId: result.tabId }, func: inspectPage });
-      const content = injected[0]?.result;
-      if (content) Object.assign(result, classifyTab({ httpStatus: result.httpStatus, content }));
-    } catch {
-      // Protected pages and unavailable frames retain their network-only result.
+  let nextResult = 0;
+  const inspectWorker = async () => {
+    while (nextResult < results.length) {
+      const result = results[nextResult++];
+      try {
+        const injected = await chrome.scripting.executeScript({ target: { tabId: result.tabId }, func: inspectPage });
+        const content = injected[0]?.result;
+        if (content) Object.assign(result, classifyTab({ httpStatus: result.httpStatus, content }));
+      } catch {
+        // Protected pages and unavailable frames retain their network-only result.
+      }
     }
-  }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(MAX_CONCURRENT_PAGE_INSPECTIONS, results.length) }, inspectWorker)
+  );
 
   await storage.saveLatestResults(results);
   await chrome.action.setBadgeText({ text: String(results.filter(isInitiallySelected).length || "") });

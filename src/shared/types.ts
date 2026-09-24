@@ -34,6 +34,7 @@ export interface Classification {
 export interface TabScanResult extends Classification {
   tabId: number;
   windowId: number;
+  duplicateOfTabId?: number;
   title: string;
   url: string;
   httpStatus?: number;

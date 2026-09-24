@@ -34,6 +34,23 @@ describe("scanTabs", () => {
     );
     expect(results).toHaveLength(2);
     expect(results.every((result) => result.status === "dead" && result.httpStatus === 404)).toBe(true);
+    expect(results.map((result) => result.duplicateOfTabId)).toEqual([undefined, 2]);
+  });
+
+  it("marks only exact URL copies after the first eligible tab as duplicates", async () => {
+    const exactCopies = [
+      { ...tabs[1], id: 20, url: "https://example.test/page?x=1#top" },
+      { ...tabs[2], id: 21, url: "https://example.test/page?x=1#top" },
+      { ...tabs[2], id: 22, url: "https://example.test/page?x=2#top" },
+      { ...tabs[2], id: 23, url: "https://example.test/page?x=1#bottom" }
+    ] as chrome.tabs.Tab[];
+
+    const results = await scanTabs(exactCopies, {
+      fetchImpl: vi.fn().mockResolvedValue(new Response(null, { status: 200 })),
+      ignoreRules: []
+    });
+
+    expect(results.map((result) => result.duplicateOfTabId)).toEqual([undefined, 20, undefined, undefined]);
   });
 
   it("falls back to GET when HEAD is rejected", async () => {
@@ -54,5 +71,30 @@ describe("scanTabs", () => {
     const [result] = await scanTabs([tabs[1]], { fetchImpl, ignoreRules: [] });
 
     expect(result).toMatchObject({ status: "temporary_error", reason: "Network timeout" });
+  });
+
+  it("uses bounded parallel requests for a large set of unique URLs", async () => {
+    const manyTabs = Array.from({ length: 20 }, (_, index) => ({
+      id: index + 1,
+      windowId: 1,
+      index,
+      title: `Tab ${index + 1}`,
+      url: `https://example.test/${index + 1}`,
+      pinned: false
+    })) as chrome.tabs.Tab[];
+    let activeRequests = 0;
+    let maximumActiveRequests = 0;
+    const fetchImpl = vi.fn(async () => {
+      activeRequests += 1;
+      maximumActiveRequests = Math.max(maximumActiveRequests, activeRequests);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      activeRequests -= 1;
+      return new Response(null, { status: 200 });
+    });
+
+    await scanTabs(manyTabs, { fetchImpl, ignoreRules: [] });
+
+    expect(maximumActiveRequests).toBeGreaterThan(6);
+    expect(maximumActiveRequests).toBeLessThan(manyTabs.length);
   });
 });

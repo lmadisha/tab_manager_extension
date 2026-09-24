@@ -82,10 +82,11 @@ export async function scanTabs(tabs: chrome.tabs.Tab[], options: ScanOptions): P
 
   return groupEntries.flatMap(([, matchingTabs], index) => {
     const classification = classifyTab(evidence[index]);
-    return matchingTabs.map((tab) => ({
+    return matchingTabs.map((tab, tabIndex) => ({
       ...classification,
       tabId: tab.id!,
       windowId: tab.windowId!,
+      ...(tabIndex > 0 ? { duplicateOfTabId: matchingTabs[0].id! } : {}),
       title: tab.title ?? tab.url!,
       url: tab.url!,
       httpStatus: evidence[index].httpStatus,
